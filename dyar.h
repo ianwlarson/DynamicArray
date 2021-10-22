@@ -1,14 +1,30 @@
 #pragma once
 
-#include <stdlib.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <limits.h>
-#include <stdbool.h>
+
+//
+// This header defines a dynamic array data structure allocates indexes in the
+// array while maintaining a list of free indexes. It also supports moving the
+// array to different buffers.
+//
+// m_free = 0x2 --+
+//                |
+// m_data         v
+//    [ INUSE ][ FREE ][ INUSE ][ FREE ]
+//                v                ^
+//             0x4 << 2            |
+//                 +----------------
+//
+// m_free has a 1-based index of a free index in the array
+// Each free index has a 1-based index left shifted by 2 of another free index,
+// or 0 which indicates no next index.
+//
 
 #define DYAR_FREE ((uintptr_t)0x1)
 #define DYAR_FLAG ((uintptr_t)0x2)
 #define DYAR_MASK ((uintptr_t)0x3)
-#define DYAR_MAX  (UINT_MAX >> 2)
+#define DYAR_MAX  ((unsigned)((~0U) >> 2))
 
 typedef struct dynamic_array_type da_t;
 
@@ -22,13 +38,15 @@ struct dynamic_array_type {
 
 __attribute__((const))
 static inline void *
-dptr(uintptr_t const p) { return (void *)(p & ~DYAR_MASK); }
+dptr(uintptr_t const p) {
+    return (void *)(p & ~DYAR_MASK);
+}
 
 __attribute__((pure))
-static inline bool
+static inline _Bool
 dyar_idx_free(da_t const*const p_da, unsigned const p_idx)
 {
-    if (p_idx >= p_da->m_allocated) return true;
+    if (p_idx >= p_da->m_allocated) return 1;
     return (p_da->m_data[p_idx] & DYAR_FREE) == DYAR_FREE;
 }
 
@@ -47,7 +65,7 @@ dyar_cap(da_t const*const p_da)
 }
 
 __attribute__((pure))
-static inline bool
+static inline _Bool
 dyar_full(da_t const*const p_da)
 {
     return p_da->m_size == p_da->m_capacity;
@@ -152,46 +170,76 @@ dyar_move(
         return -1;
     }
 
-    if (newcap >= p_da->m_capacity) {
-        // Increasing the size of the dynamic array
-        for (unsigned i = 0; i < p_da->m_allocated; ++i) {
-            nbuff[i] = p_da->m_data[i];
-        }
+    *r_oldbuf = p_da->m_data;
+    *r_oldlen = p_da->m_capacity * sizeof(*nbuff);
 
-        *r_oldbuf = p_da->m_data;
-        *r_oldlen = p_da->m_capacity * sizeof(*nbuff);
+    if (newcap >= p_da->m_capacity) {
+        // Increasing the size of the dynamic array is trivial, just copy the
+        // data directly.
+        __builtin_memcpy(nbuff, p_da->m_data, p_da->m_allocated * sizeof(uintptr_t));
 
         p_da->m_data = nbuff;
         p_da->m_capacity = newcap;
 
     } else {
+
         // Decreasing the size of the dynamic array
         if (newcap >= p_da->m_allocated) {
 
             // The capacity is decreasing but the indexes in the difference
-            // haven't been touched.
-            for (unsigned i = 0; i < p_da->m_allocated; ++i) {
-                nbuff[i] = p_da->m_data[i];
-            }
-
-            *r_oldbuf = p_da->m_data;
-            *r_oldlen = p_da->m_capacity * sizeof(*nbuff);
+            // haven't been touched. We can copy directly to the new array.
+            __builtin_memcpy(nbuff, p_da->m_data, p_da->m_allocated * sizeof(uintptr_t));
 
             p_da->m_data = nbuff;
             p_da->m_capacity = newcap;
         } else {
 
-            // This is the annoying case. We're decreasing the size of the
-            // array but some of the elements we're removing are on the free
-            // list.
-            // TODO: Implement this
-            return -1;
+            // See if we can decrease the size of the array. This is a tricky
+            // operation because it requires recreating the free list, which
+            // requires a bunch of extra checks compared to an optimized
+            // memcpy.
 
             for (unsigned i = newcap; i < p_da->m_allocated; ++i) {
+                // There were actual in-use indices greater than the new
+                // capacity, the resize cannot be done.
                 if ((p_da->m_data[i] & DYAR_FREE) != DYAR_FREE) {
                     return -1;
                 }
             }
+
+            // Nothing beyond newcap is actually in-use, but it could be on the
+            // free list. Recreate the freelist
+
+            unsigned last_free = 0;
+            p_da->m_free = 0;
+            for (unsigned i = 0; i < newcap; ++i) {
+
+                uintptr_t const v = p_da->m_data[i];
+
+                if ((v & DYAR_FREE) == DYAR_FREE) {
+                    if (p_da->m_free == 0) {
+                        // The first time we find a free index, point m_free at
+                        // it, and keep track of it.
+                        last_free = i;
+                        p_da->m_free = i+1;
+                    } else {
+                        // Every subsequent free index, update the last free
+                        // index to point at it.
+                        nbuff[last_free] = ((i+1) << 2) | DYAR_FREE;
+                        last_free = i;
+                    }
+                } else {
+                    // Copy in-use elements directly
+                    nbuff[i] = v;
+                }
+            }
+
+            // Update the very last free index found to the "NULL pointer".
+            nbuff[last_free] = DYAR_FREE;
+
+            p_da->m_data = nbuff;
+            p_da->m_allocated = newcap;
+            p_da->m_capacity = newcap;
         }
     }
 

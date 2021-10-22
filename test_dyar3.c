@@ -5,6 +5,7 @@
 #include <assert.h>
 
 #include "dyar.h"
+#include "dyar_check.h"
 
 #define A_VAL ((void *)(1 << 2))
 #define B_VAL ((void *)(2 << 2))
@@ -54,6 +55,11 @@ main(void)
             (void)dyar_add(da, A_VAL);
         } else {
             dyar_free(da, idx);
+        }
+
+        if ((i & 0xfff) == 0) {
+            status = dyar_valid(da);
+            assert(status == 0);
         }
     }
 

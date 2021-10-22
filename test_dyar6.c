@@ -5,7 +5,6 @@
 #include <string.h>
 #include <assert.h>
 
-#include "dyar.h"
 #include "dyar_check.h"
 
 static inline unsigned
@@ -45,43 +44,51 @@ main(void)
         (void)xorshift32(&rng);
     }
 
-    for (unsigned i = 0; i < 256; ++i) {
-        (void)dyar_add(da, malloc(123));
-    }
+    for (;;) {
 
-    for (int i = 0; i < 1000000; ++i) {
-
-        unsigned idx = xorshift32(&rng) & 0xffu;
-        if (dyar_idx_free(da, idx)) {
-            (void)dyar_add(da, malloc(123));
-        } else {
-            void *ptr = dyar_get(da, idx);
-
-            // Write into the pointers, fsanitize=address will catch us
-            // following bad ptrs.
-            memset(ptr, 1, 123);
-            status = dyar_free(da, idx);
-            assert(status == 0);
-            free(ptr);
+        if (dyar_full(da)) {
+            break;
         }
 
-        if ((i & 0xfff) == 0) {
-            status = dyar_valid(da);
-            assert(status == 0);
-        }
+        (void)dyar_add(da, malloc(13));
     }
 
-    // Free all the entries. If we miss any the address sanitizer will let us
-    // know.
-    for (unsigned i = 0; i < 256; ++i) {
+    status = dyar_valid(da);
+    assert(status == 0);
+
+    // Free all of the entries except for some at the end.
+    for (unsigned i = 0; i < (da->m_allocated - 5); ++i) {
+        void *ptr = dyar_get(da, i);
+        assert(ptr != NULL);
+        free(ptr);
+        status = dyar_free(da, i);
+        assert(status == 0);
+    }
+
+    status = dyar_valid(da);
+    assert(status == 0);
+
+    size_t const resizelen = 64 * sizeof(void *);
+    void *resize_buf = malloc(resizelen);
+    status = dyar_move(da, resize_buf, resizelen, &oldbuf, &oldlen);
+    assert(status == -1);
+
+    status = dyar_valid(da);
+    assert(status == 0);
+
+    for (unsigned i = 0; i < da->m_allocated; ++i) {
         void *ptr = dyar_get(da, i);
         if (ptr != NULL) {
-            memset(ptr, 2, 123);
-            dyar_free(da, i);
             free(ptr);
+            status = dyar_free(da, i);
+            assert(status == 0);
         }
     }
 
+    status = dyar_valid(da);
+    assert(status == 0);
+
+    free(resize_buf);
     free(buffer);
     free(da);
 
