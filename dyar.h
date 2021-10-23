@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 //
 // This header defines a dynamic array data structure allocates indexes in the
@@ -176,7 +177,9 @@ dyar_move(
     if (newcap >= p_da->m_capacity) {
         // Increasing the size of the dynamic array is trivial, just copy the
         // data directly.
-        __builtin_memcpy(nbuff, p_da->m_data, p_da->m_allocated * sizeof(uintptr_t));
+        if ((nbuff != NULL) && (p_da->m_data != NULL)) {
+            __builtin_memcpy(nbuff, p_da->m_data, p_da->m_allocated * sizeof(uintptr_t));
+        }
 
         p_da->m_data = nbuff;
         p_da->m_capacity = newcap;
@@ -188,7 +191,9 @@ dyar_move(
 
             // The capacity is decreasing but the indexes in the difference
             // haven't been touched. We can copy directly to the new array.
-            __builtin_memcpy(nbuff, p_da->m_data, p_da->m_allocated * sizeof(uintptr_t));
+            if ((nbuff != NULL) && (p_da->m_data != NULL)) {
+                __builtin_memcpy(nbuff, p_da->m_data, p_da->m_allocated * sizeof(uintptr_t));
+            }
 
             p_da->m_data = nbuff;
             p_da->m_capacity = newcap;
@@ -225,7 +230,7 @@ dyar_move(
                     } else {
                         // Every subsequent free index, update the last free
                         // index to point at it.
-                        nbuff[last_free] = ((i+1) << 2) | DYAR_FREE;
+                        nbuff[last_free] = (uintptr_t)((i+1) << 2) | DYAR_FREE;
                         last_free = i;
                     }
                 } else {

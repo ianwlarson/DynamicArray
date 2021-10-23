@@ -1,5 +1,5 @@
-CC=clang
-CFLAGS=-O0 -Wall -Wpedantic -std=gnu11 -fsanitize=undefined -fsanitize=address -ggdb3
+CC=gcc
+CFLAGS=-O0 -Wall -Wpedantic -std=gnu11 -fsanitize=undefined -fsanitize=address -ggdb3 -fprofile-arcs -ftest-coverage
 
 TESTS = test_dyar1 \
 		test_dyar2 \
@@ -8,7 +8,10 @@ TESTS = test_dyar1 \
 		test_dyar5 \
 		test_dyar6 \
 		test_dyar7 \
-		test_dyar8
+		test_dyar8 \
+		test_dyar9 \
+		test_dyar10 \
+		test_dyar11
 
 
 .PHONY: clean all
@@ -31,6 +34,15 @@ test_dyar7: test_dyar7.c dyar_check.c dyar_check.h dyar.h
 	$(CC) $(filter %.c,$^) -o $@ $(CFLAGS)
 test_dyar8: test_dyar8.c dyar_check.c dyar_check.h dyar.h
 	$(CC) $(filter %.c,$^) -o $@ $(CFLAGS)
+test_dyar9: test_dyar9.c dyar_check.c dyar_check.h dyar.h
+	$(CC) $(filter %.c,$^) -o $@ $(CFLAGS)
+test_dyar10: test_dyar10.c dyar_check.c dyar_check.h dyar.h
+	$(CC) $(filter %.c,$^) -o $@ $(CFLAGS)
+test_dyar11: test_dyar11.c dyar_check.c dyar_check.h dyar.h
+	$(CC) $(filter %.c,$^) -o $@ $(CFLAGS)
 
 clean:
 	@rm -f $(TESTS)
+	@rm -f *.gcno
+	@rm -f *.gcda
+	@rm -f *.info
