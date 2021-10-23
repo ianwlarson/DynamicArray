@@ -9,10 +9,10 @@
 // array while maintaining a list of free indexes. It also supports moving the
 // array to different buffers.
 //
-// m_free = 0x2 --+
-//                |
-// m_data         v
-//    [ INUSE ][ FREE ][ INUSE ][ FREE ]
+// m_free = 0x2 --+               5<<2
+//                |                 +--------
+// m_data         v                 |       v
+//    [ INUSE ][ FREE ][ INUSE ][ FREE ][ FREE ]
 //                v                ^
 //             0x4 << 2            |
 //                 +----------------
@@ -103,6 +103,34 @@ dyar_add_safe(da_t *const p_da, void *const p_ptr, unsigned *const r_idx)
 
     *r_idx = dyar_add(p_da, p_ptr);
     return 0;
+}
+
+/**
+ * Alternate interface that returns the pointer to the object being removed, or
+ * (void *)-1 if the element wasn't inuse.
+ *
+ * Probably faster (?)
+ *
+ * @param p_da
+ * @param p_idx Index to free
+ * @return      (void *)-1 if the index was not free. The pointer stored in the
+ *              index otherwise.
+ */
+static inline void*
+dyar_free_f(da_t *const p_da, unsigned const p_idx)
+{
+    void *o = (void *)-1;
+    if (p_idx < p_da->m_allocated) {
+        uintptr_t const v = p_da->m_data[p_idx];
+        if ((v & DYAR_FREE) != DYAR_FREE) {
+            o = dptr(v);
+            p_da->m_data[p_idx] = (uintptr_t)(p_da->m_free << 2) | DYAR_FREE;
+            p_da->m_free = p_idx + 1;
+            --p_da->m_size;
+        }
+    }
+
+    return o;
 }
 
 static inline int

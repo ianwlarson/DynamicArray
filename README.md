@@ -18,3 +18,5 @@ track of objects with very low runtime costs.
 9. Test resizing an array to size 0
 10. Repeatedly filling and emptying the array
 11. Simple case for shrinking an array (when the difference in size is unused).
+12. Repeatedly fill and resize the array with random insertions and deletions
+

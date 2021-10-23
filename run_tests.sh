@@ -11,4 +11,5 @@
 ./test_dyar9 > /dev/null || echo "Test 9 failed!\n"
 ./test_dyar10 > /dev/null || echo "Test 10 failed!\n"
 ./test_dyar11 > /dev/null || echo "Test 11 failed!\n"
+./test_dyar12 > /dev/null || echo "Test 12 failed!\n"
 

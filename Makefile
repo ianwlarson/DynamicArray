@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O0 -Wall -Wpedantic -std=gnu11 -fsanitize=undefined -fsanitize=address -ggdb3 -fprofile-arcs -ftest-coverage
+CFLAGS=-O2 -Wall -Wpedantic -std=gnu11 -fsanitize=undefined -fsanitize=address -ggdb3 #-fprofile-arcs -ftest-coverage
 
 TESTS = test_dyar1 \
 		test_dyar2 \
@@ -11,7 +11,8 @@ TESTS = test_dyar1 \
 		test_dyar8 \
 		test_dyar9 \
 		test_dyar10 \
-		test_dyar11
+		test_dyar11 \
+		test_dyar12
 
 
 .PHONY: clean all
@@ -39,6 +40,8 @@ test_dyar9: test_dyar9.c dyar_check.c dyar_check.h dyar.h
 test_dyar10: test_dyar10.c dyar_check.c dyar_check.h dyar.h
 	$(CC) $(filter %.c,$^) -o $@ $(CFLAGS)
 test_dyar11: test_dyar11.c dyar_check.c dyar_check.h dyar.h
+	$(CC) $(filter %.c,$^) -o $@ $(CFLAGS)
+test_dyar12: test_dyar12.c dyar_check.c dyar_check.h dyar.h
 	$(CC) $(filter %.c,$^) -o $@ $(CFLAGS)
 
 clean:
